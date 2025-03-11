@@ -9,7 +9,7 @@ import numpy as np
 from scipy.stats import norm
 
 class Option:
-    """Base Option class with common attributes and methods"""
+    """Base Option class"""
     def __init__(self, S0, K, T, r, sigma):
         """
         Initialize base option parameters
@@ -44,7 +44,7 @@ class Option:
         return self._calculate_d1() - self.sigma * np.sqrt(self.T)
 
 class EuropeanOption(Option):
-    """European Option pricing using Black-Scholes formula"""
+    """European Option pricing: Allow Early Exercise"""
     
     def call_price(self):
         """Calculate European call option price"""
