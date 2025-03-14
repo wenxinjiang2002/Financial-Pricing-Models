@@ -3,6 +3,19 @@ Black-Scholes option pricing
 
 created on Feb 17
 authur: Wenxin.J
+
+Input Parameters:
+Compute d₁ and d₂:
+d1
+Represents the standardized distance (in standard deviation units) between the current stock price and 
+the strike price, adjusted for the risk-free rate and volatility.
+It can be viewed as a measure of how “in-the-money” the option is when accounting for 
+the expected growth of the asset under risk-neutral conditions.
+d2
+subtracting sigma times sqt T from d1
+reflects the probability that the option will be exercised (i.e., it expires in the money) 
+when adjusted for the effect of volatility over the remaining time to maturity.
+
 """
 
 import numpy as np
