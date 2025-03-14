@@ -13,6 +13,9 @@ where:
 - α is the mean reversion speed
 - σ is the volatility
 - W(t) is a Wiener process
+
+Calibration with Swaption:
+Using the Hull-White model, the expected payoff of the swaption is computed by:
 """
 
 import numpy as np
@@ -182,7 +185,7 @@ if __name__ == "__main__":
     sigma = 0.02   # Volatility
     T = 10.0       # Time horizon
     steps = 250    # Number of time steps
-    r0 = 0.02     # Initial short rate
+    r0 = 0.02      # Initial short rate
     
     # Create model instance
     hw_model = HullWhite(alpha, sigma, T, steps, r0)
