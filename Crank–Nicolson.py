@@ -3,6 +3,8 @@ Implementation of the Crank–Nicolson method for the untransformed Black–Scho
 Aim to compare the numerical results against the exact Black–Scholes formula at a chosen time t<T. 
 """
 
+from black_sh_derivative import EuropeanOption, AmericanOption
+
 import numpy as np
 from math import log, sqrt, exp
 from scipy.stats import norm
