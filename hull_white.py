@@ -1,9 +1,16 @@
 """
-Hull-White One-Factor Interest Rate Model
+Hull-White Interest Rate Model
 
 Created on: Feb 17
-Author: Wenxin.J
 
+##TODO##
+ - add θ Calibration
+ - add cap/swaption vol surface
+
+Author: Wenxin.J
+"""
+
+"""
 The Hull-White model is defined by the SDE:
 dr(t) = [θ(t) - α*r(t)]dt + σdW(t)
 
