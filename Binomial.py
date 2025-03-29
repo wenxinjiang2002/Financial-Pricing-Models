@@ -1,122 +1,66 @@
 import numpy as np
-import scipy.linalg as linalg
-import scipy.interpolate as interp
 import pandas as pd
+from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 
-# Parameters
-E = 10.0        # Strike price
-r = 0.1         # Risk-free rate
-sigma = 0.4     # Volatility
-T = 1.0 / 3.0   # Time to maturity: 4 months
+# Parameters from part (1)(b)
+E = 10          # Strike price
+r = 0.25        # Risk-free rate
+q = 0.2         # Dividend yield
+sigma = 0.8     # Volatility
+T = 1.0         # Maturity
+S_values = [10, 20, 25]  # Prices to evaluate
 
-S_max = 20      # Max stock price
-M = 200         # Number of spatial steps
-N = 100         # Number of time steps
-
-dS = S_max / M
+# Binomial tree setup
+N = 200                     # Number of time steps
 dt = T / N
+nu = r - q                  # Drift adjusted for dividend
+u = np.exp(sigma * np.sqrt(dt))    # Up factor
+d = 1 / u                           # Down factor
+p = (np.exp(nu * dt) - d) / (u - d) # Risk-neutral probability
 
-S = np.linspace(0, S_max, M + 1)
+# Display binomial parameters
+print(f"U = {u:.4f}, D = {d:.4f}, P = {p:.4f}")
 
-# Initial conditions
-V_eur = np.maximum(E - S, 0)
-V_am = V_eur.copy()
+# Binomial pricing function for American call
+def binomial_american_call(S0):
+    # Initialize prices at maturity
+    ST = np.array([S0 * (u ** j) * (d ** (N - j)) for j in range(N + 1)])
+    values = np.maximum(ST - E, 0)
 
-def apply_boundary_conditions(V, tau):
-    V[0] = E * np.exp(-r * (T - tau))
-    V[-1] = 0.0
-    return V
+    # Backward induction
+    for i in range(N - 1, -1, -1):
+        values = np.exp(-r * dt) * (p * values[1:i+2] + (1 - p) * values[0:i+1])
+        S_nodes = np.array([S0 * (u ** j) * (d ** (i - j)) for j in range(i + 1)])
+        values = np.maximum(values, S_nodes - E)  # Early exercise check
+    return values[0]
 
-def build_tridiagonal_matrices():
-    alpha = 0.5 * dt * ((sigma ** 2) * (S[1:M] ** 2) / dS ** 2 - (r * S[1:M]) / dS)
-    beta = 1 + dt * ((sigma ** 2) * (S[1:M] ** 2) / dS ** 2 + r)
-    gamma = 0.5 * dt * ((sigma ** 2) * (S[1:M] ** 2) / dS ** 2 + (r * S[1:M]) / dS)
+# Compute binomial prices
+binomial_results = []
+for S0 in S_values:
+    price = binomial_american_call(S0)
+    binomial_results.append((S0, price))
 
-    A = np.zeros((M - 1, M - 1))
-    B = np.zeros((M - 1, M - 1))
 
-    for j in range(M - 1):
-        if j > 0:
-            A[j, j - 1] = -alpha[j]
-            B[j, j - 1] = alpha[j]
-        A[j, j] = beta[j]
-        B[j, j] = 2 - beta[j]
-        if j < M - 2:
-            A[j, j + 1] = -gamma[j]
-            B[j, j + 1] = gamma[j]
-    return A, B
 
-A, B = build_tridiagonal_matrices()
+# Interpolate finite difference (FD) results
+euro_interp = interp1d(S, V_eur_call, kind='linear')
+amer_interp = interp1d(S, V_am_call, kind='linear')
 
-# ---- European Put Solver ----
-def solve_european_put():
-    V = np.maximum(E - S, 0)
+# Compare results
+comparison = []
+for S0, bino_price in binomial_results:
+    euro_val = euro_interp(S0)
+    amer_val = amer_interp(S0)
+    comparison.append({
+        "S": S0,
+        "Binomial American Call": bino_price,
+        "FD European Call": euro_val,
+        "FD American Call": amer_val
+    })
 
-    lower = np.diag(A, k=-1)
-    main = np.diag(A)
-    upper = np.diag(A, k=1)
+comparison_df = pd.DataFrame(comparison)
+print(comparison_df)
 
-    ab = np.zeros((3, M - 1))
-    ab[0, 1:] = upper
-    ab[1, :] = main
-    ab[2, :-1] = lower
-
-    for n in range(N):
-        tau = (n + 1) * dt
-        rhs = B @ V[1:M]
-        rhs[0] += A[0, 0] * V[0]
-        rhs[-1] += A[-1, -1] * V[-1]
-        V[1:M] = linalg.solve_banded((1, 1), ab, rhs)
-        V = apply_boundary_conditions(V, tau)
-    return V
-
-V_eur = solve_european_put()
-
-# ---- American Put with Projected SOR ----
-def solve_american_put():
-    V = np.maximum(E - S, 0)
-    omega = 1.2
-    tol = 1e-6
-    max_iter = 10000
-
-    for n in range(N):
-        tau = (n + 1) * dt
-        rhs = B @ V[1:M]
-        rhs[0] += A[0, 0] * V[0]
-        rhs[-1] += A[-1, -1] * V[-1]
-        V_old = V[1:M].copy()
-        for _ in range(max_iter):
-            V_new = V_old.copy()
-            for j in range(M - 1):
-                sum_ = 0
-                if j > 0:
-                    sum_ += A[j, j - 1] * V_new[j - 1]
-                if j < M - 2:
-                    sum_ += A[j, j + 1] * V_old[j + 1]
-                sum_ = (rhs[j] - sum_) / A[j, j]
-                V_new[j] = max(E - S[j + 1], V_old[j] + omega * (sum_ - V_old[j]))
-            error = np.linalg.norm(V_new - V_old, ord=np.inf)
-            V_old = V_new
-            if error < tol:
-                break
-        V[1:M] = V_old
-        V = apply_boundary_conditions(V, tau)
-    return V
-
-V_am = solve_american_put()
-
-# ---- Interpolation at Requested Points ----
-query_S = np.arange(0, 17, 2)
-interp_eur = interp.interp1d(S, V_eur, kind='linear')
-interp_am = interp.interp1d(S, V_am, kind='linear')
-
-results_df = pd.DataFrame({
-    "S": query_S,
-    "European Put": interp_eur(query_S),
-    "American Put": interp_am(query_S)
-})
-
-print(results_df)
 
 
